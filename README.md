@@ -2,3 +2,5 @@
 =============
 
 24-point Game solution
+
+base on JavaScript， eg: use nodejs 
