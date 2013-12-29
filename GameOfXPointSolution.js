@@ -1,68 +1,106 @@
+var logger = require('tracer').dailyfile({root:'d:/logs'});
 
-var TwentyFor = function(data, target, path) {
+var TwentyFour = function(data) {
 	this.data = data || [];
-	this.path = path || "";
-	this.target = target || 0;
-	this.solution = undefined;
 	this.path = "";
+	this.target = 24
+	this.solution = undefined;
+	this.operator = ['+', '-', '*', '/'];
 
-	this.combineData = function(d1, d2) {
-		return [
-		{
-			result: d1 + d2,
-			path: d1 + " + " + d2
-		},
-		{
-			result: d1 - d2,
-			path: d1 + " - " + d2
-		},
-		{
-			result: d1 * d2,
-			path: d1 + " * " + d2
-		},
-		{
-			result: d1 / d2,
-			path: d1 + " / " + d2
-		},
-		{
-			result: d2 - d1,
-			path: d2 + " - " + d1
-		},
-		{
-			result: d2 / d1,
-			path: d2 + " / " + d1
-		},
-		];
+	var expressionData = function(value, expression) {
+		this.value = value || 0;
+		this.expression = expression || "";
+
+		this.getValue = function() {
+			return this.value;
+		}
+
+		this.getExpression = function() {
+			return this.expression;
+		}
+
+		this.setValue = function(value) {
+			this.value = value;
+		}
+
+		this.setExpression = function(expression) {
+			this.expression = expression + '';
+		}
+
+		this.toString = function() {
+			return this.value;
+		}
+	}
+
+	this.getBaseOperation = function(num1, num2, operation) {
+		var result = undefined;
+		switch(operation) {
+			case '+': 
+				result = num1 + num2;
+				break;
+			case '-':
+				if (num1 > num2) {
+					result = num1 - num2;
+				}
+				break;
+			case '*':
+				result = num1 * num2;
+				break;
+			case '/':
+				var tmp = num1 / num2;
+				if ((tmp | 0) == tmp) {
+					result = tmp;
+				}
+				break;
+		}
+		return result;
+	}
+
+	this.getArithOpRst = function(expsData1, expsData2) {
+		var opRst = [];
+		var num1 = expsData1.getValue();
+		var expression1 = expsData1.getExpression();
+		var num2 = expsData2.getValue();
+		var expression2 = expsData2.getExpression();
+		for (var i = 0; i < this.operator.length ; i++) {
+			var expsData = new expressionData();
+			var opt = this.operator[i];
+			var value = this.getBaseOperation(num1, num2, opt);
+			if (value !== undefined) {
+				expsData.setValue(value);
+				expsData.setExpression("(" + expression1 + " " + opt + " " + expression2 + ")");
+				opRst.push(expsData);
+			}
+		}
+		return opRst;
 	}
 
 	
 
-	this.getSub2Datas = function(list) {
+	this.getSubDataList = function(list) {
 		var sub2list = [];
 		for (var i = 0; i < list.length; i++) {
 			for (var j = 0; j < i; j++) {
-				sub2list.push({
-					data: [list[j], list[i]],
-					index: [j, i]
-				});
+				sub2list.push(
+					[i, j]
+				);
 			}
 		}
 		return sub2list;
 	}
 
-	this.dataInArray = function(data, list) {
-		for (var i = 0 ; i < list.length; i++) {
-			if (data == list[i]) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	this.getRestList = function (list, index) {
+		var dataInArray = function(data, array) {
+			for (var i = 0 ; i < array.length; i++) {
+				if (data == array[i]) {
+					return true;
+				}
+			}
+			return false;
+		}
 		var restList = [];
 		for (var i = 0; i < list.length ; i++ ) {
-			if (this.dataInArray(i, index)) {
+			if (dataInArray(i, index)) {
 				continue;
 			}else {
 				restList.push(list[i]);
@@ -71,41 +109,49 @@ var TwentyFor = function(data, target, path) {
 		return restList;
 	}
 
-	this.findSolution = function(list, path) {
+	this.findSolution = function(list) {
 		if (this.solution !== undefined) {
 			return;
 		}
 		if (list.length >= 2) {
-			var twoDatas = this.getSub2Datas(list);
-			for (var i = 0 ; i < twoDatas.length ; i++) {
-				var data = twoDatas[i].data;
-				var combins = this.combineData(data[0], data[1]);
-				var restList = this.getRestList(list, twoDatas[i].index);
-				for (var j = 0 ; j < combins.length; j++) {
-					var newList = restList.concat(combins[j].result);
-					this.findSolution(newList, path + "|" + combins[j].path);
+			var subDataList = this.getSubDataList(list);
+			for (var i = 0 ; i < subDataList.length ; i++) {
+				var ind = subDataList[i];
+				var expsData1 = list[ind[0]];
+				var expsData2 = list[ind[1]];
+				var arithOpRst = this.getArithOpRst(expsData1, expsData2);
+				
+				for (var j = 0 ; j < arithOpRst.length; j++) {
+					var restList = this.getRestList(list, ind);
+					var newList = restList.concat(arithOpRst[j]);
+					this.findSolution(newList);
 				}
 			}
-		}else if (list.length == 1 && list[0] == this.target) {
+		}else if (list.length == 1 && list[0].getValue() == this.target) {
 			this.solution = true;
-			this.path = path;
-			console.log("aloha")
+			this.path = list[0].getExpression() + " = " + this.target;
+			logger.log("aloha")
 		}
 	}
 
 	this.generateData = function() {
+		var data = [];
 		for (var i = 0 ; i < 4; i++) {
 			var d = Math.floor(Math.random() * 13);
-			this.data.push(d);
+			var expsData = new expressionData();
+			expsData.setValue(d);
+			expsData.setExpression(d);
+			data.push(expsData);
 		}
+		
+		return data;
 	}
 }
 
 
 
-var ten24 = new TwentyFor();
-ten24.generateData();
-ten24.target = 24;
-console.log(ten24.data)
-ten24.findSolution(ten24.data, "")
-console.log(ten24.path)
+var twentyfour = new TwentyFour();
+var data = twentyfour.generateData();
+logger.log(data)
+twentyfour.findSolution(data)
+logger.log(twentyfour.path)
